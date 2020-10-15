@@ -33,13 +33,13 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [_LOWER] = LAYOUT(
   //┌────────┬────────┬────────┬────────┬────────┬────────┐                          ┌────────┬────────┬────────┬────────┬────────┬────────┐
-     KC_TILD, KC_EXLM, KC_AT,   KC_HASH, KC_DLR,  KC_PERC,                            KC_CIRC, KC_AMPR, KC_ASTR, KC_INS,  KC_HOME, KC_PGUP,
+     KC_TILD, KC_EXLM, KC_AT,   KC_HASH, KC_DLR,  KC_PERC,                            KC_LBRC, KC_RBRC, KC_ASTR, KC_INS,  KC_HOME, KC_PGUP,
   //├────────┼────────┼────────┼────────┼────────┼────────┤                          ├────────┼────────┼────────┼────────┼────────┼────────┤
      RESET,   KC_1,    KC_2,    KC_3,    KC_4,    KC_5,                               _______, _______, _______, KC_DEL,  KC_END,  KC_PGDN,
   //├────────┼────────┼────────┼────────┼────────┼────────┤                          ├────────┼────────┼────────┼────────┼────────┼────────┤
-     RGB_MOD, _______, KC_LEFT, KC_RGHT, KC_UP,   KC_LBRC,                            KC_LEFT, KC_DOWN, KC_UP,   KC_RIGHT,KC_PLUS, KC_HOME,
+     RGB_MOD, RGB_TOG, KC_LEFT, KC_RGHT, KC_UP,   KC_LBRC,                            KC_LEFT, KC_DOWN, KC_UP,   KC_RIGHT,KC_PLUS, KC_HOME,
   //├────────┼────────┼────────┼────────┼────────┼────────┼────────┐        ┌────────┼────────┼────────┼────────┼────────┼────────┼────────┤
-     BL_STEP, _______, _______, _______, KC_DOWN, KC_LCBR, _______,          _______, KC_RCBR, KC_P1,   KC_UNDS, KC_EQUAL,KC_MINS, KC_END,
+     BL_STEP, BL_TOGG, _______, _______, KC_DOWN, KC_LCBR, _______,          _______, KC_RCBR, KC_P1,   KC_UNDS, KC_EQUAL,KC_MINS, KC_END,
   //└────────┴────────┴────────┴───┬────┴───┬────┴───┬────┴───┬────┘        └───┬────┴───┬────┴───┬────┴───┬────┴────────┴────────┴────────┘
                                     _______, _______, _______,                    _______,  _______, KC_P0
                                 // └────────┴────────┴────────┘                 └────────┴────────┴────────┘
@@ -132,9 +132,11 @@ void encoder_update_user(uint8_t index, bool anticlockwise) {
         if (anticlockwise) {
             if(rotary_position == 0) { rotary_position = 20; }
             rotary_position--;
+            tap_code(KC_AUDIO_VOL_DOWN);
         } else {
             if(rotary_position == 19) { rotary_position = 0; }
             rotary_position++;
+            tap_code(KC_AUDIO_VOL_UP);
         }
         uprintf("Rotary possition: %d\n", rotary_position);
     }
