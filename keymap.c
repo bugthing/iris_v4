@@ -110,33 +110,33 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
       }
       return false;
       break;
-    case ROTARY:
-      if (record->event.pressed) {
-        set_single_persistent_default_layer(rotary_position);
-      }
-      return false;
-      break;
-    case LSFT(ROTARY):
-      if (record->event.pressed) {
-        rotary_position = 0;
-        set_single_persistent_default_layer(rotary_position);
-      }
-      return false;
-      break;
+    //case ROTARY:
+    //  if (record->event.pressed) {
+    //    set_single_persistent_default_layer(rotary_position);
+    //  }
+    //  return false;
+    //  break;
+    //case LSFT(ROTARY):
+    //  if (record->event.pressed) {
+    //    rotary_position = 0;
+    //    set_single_persistent_default_layer(rotary_position);
+    //  }
+    //  return false;
+    //  break;
   }
   return true;
 }
 
-void encoder_update_user(uint8_t index, bool anticlockwise) {
+void encoder_update_user(uint8_t index, bool clockwise) {
     if (index == 0) {
-        if (anticlockwise) {
-            if(rotary_position == 0) { rotary_position = 20; }
-            rotary_position--;
-            tap_code(KC_AUDIO_VOL_DOWN);
-        } else {
+        if (clockwise) {
             if(rotary_position == 19) { rotary_position = 0; }
             rotary_position++;
             tap_code(KC_AUDIO_VOL_UP);
+        } else {
+            if(rotary_position == 0) { rotary_position = 20; }
+            rotary_position--;
+            tap_code(KC_AUDIO_VOL_DOWN);
         }
         uprintf("Rotary possition: %d\n", rotary_position);
     }
