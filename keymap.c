@@ -127,7 +127,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
   return true;
 }
 
-void encoder_update_user(uint8_t index, bool clockwise) {
+bool encoder_update_user(uint8_t index, bool clockwise) {
     if (index == 0) {
         if (clockwise) {
             if(rotary_position == 19) { rotary_position = 0; }
@@ -138,6 +138,6 @@ void encoder_update_user(uint8_t index, bool clockwise) {
             rotary_position--;
             tap_code(KC_AUDIO_VOL_DOWN);
         }
-        uprintf("Rotary possition: %d\n", rotary_position);
     }
+    return true;
 }
