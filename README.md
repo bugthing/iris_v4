@@ -107,3 +107,17 @@ Compile and flash (see above)
 ### Encoder
 
 read this for encoder https://docs.qmk.fm/#/feature_encoders
+
+### Docker
+
+To help build and flash the keyboard there is a Dockefile
+
+    docker build -t qmkflasher .
+    docker run -it --rm --volume `pwd`:/qmk/iris_v4 qmkflasher make keebio/iris/rev4:ben:flash
+
+## SELinux
+
+When using Fedora I had to allow containers to control devices using:
+
+      sudo setsebool -P container_use_devices=true
+
