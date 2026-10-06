@@ -13,6 +13,7 @@ enum custom_keycodes {
   RAISE,
   ADJUST,
   ROTARY,
+  GBP,
 };
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
@@ -33,7 +34,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [_LOWER] = LAYOUT(
   //┌────────┬────────┬────────┬────────┬────────┬────────┐                          ┌────────┬────────┬────────┬────────┬────────┬────────┐
-     KC_TILD, KC_EXLM, KC_AT,   KC_HASH, KC_DLR,  KC_PERC,                            KC_LBRC, KC_RBRC, KC_ASTR, KC_INS,  KC_HOME, KC_PGUP,
+     KC_TILD, KC_EXLM, KC_AT,   GBP,     KC_DLR,  KC_PERC,                            KC_LBRC, KC_RBRC, KC_ASTR, KC_INS,  KC_HOME, KC_PGUP,
   //├────────┼────────┼────────┼────────┼────────┼────────┤                          ├────────┼────────┼────────┼────────┼────────┼────────┤
      KC_GRAVE, KC_1,   KC_2,    KC_3,    KC_4,    KC_5,                               _______, _______, _______, KC_DEL,  KC_END,  KC_PGDN,
   //├────────┼────────┼────────┼────────┼────────┼────────┤                          ├────────┼────────┼────────┼────────┼────────┼────────┤
@@ -107,6 +108,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         layer_on(_ADJUST);
       } else {
         layer_off(_ADJUST);
+      }
+      return false;
+      break;
+    case GBP:
+      // Compose (Caps Lock via compose:caps), L, - => £
+      if (record->event.pressed) {
+        SEND_STRING(SS_TAP(X_CAPS) "L-");
       }
       return false;
       break;
