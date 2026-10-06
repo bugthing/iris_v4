@@ -87,6 +87,21 @@ Flash the files onto the hardware
 
     sudo make keebio/iris/rev4:myown:flash
 
+### Build and flash with the scripts
+
+Build in the official QMK Docker image (clones QMK into `~/.cache/qmk_firmware`
+on first run; `--update` pulls the latest QMK):
+
+    bin/build [--update]
+
+This writes `keebio_iris_rev4_ben.hex` to this directory. Then flash both halves
+(or pass a different hex path):
+
+    bin/flash [path/to/firmware.hex]
+
+It asks for your sudo password up front, then for each half waits for the
+bootloader (unplug, hold reset, plug in, release), flashes it, and moves on.
+
 ### Use online tool
 
 Go to: https://config.qmk.fm/#/keebio/iris/rev4/LAYOUT

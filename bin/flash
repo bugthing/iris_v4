@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Flash both halves of the Iris rev4, one after the other.
+#
+# Usage: bin/flash [path/to/firmware.hex]
+#
+# For each half: unplug it, hold the reset button on the underside, plug it
+# in and release. The script spots the bootloader, flashes, then waits for
+# the next half.
+
+set -euo pipefail
+
+HEX="${1:-$(dirname "$0")/../keebio_iris_rev4_ben.hex}"
+MCU=atmega32u4
+DFU_ID=03eb:2ff4 # Atmel DFU bootloader for the atmega32u4
+
+if [[ ! -f "$HEX" ]]; then
+  echo "Firmware not found: $HEX" >&2
+  echo "Build it first, or pass the path: bin/flash path/to/firmware.hex" >&2
+  exit 1
+fi
+
+for cmd in dfu-programmer lsusb; do
+  command -v "$cmd" >/dev/null || { echo "Missing $cmd" >&2; exit 1; }
+done
+
+in_bootloader() { lsusb -d "$DFU_ID" >/dev/null 2>&1; }
+
+# Ask for the password now, before the keyboard is unplugged.
+sudo -v
+
+wait_for() {
+  local want=$1
+  while true; do
+    if [[ $want == present ]] && in_bootloader; then return; fi
+    if [[ $want == absent ]] && ! in_bootloader; then return; fi
+    sudo -n -v 2>/dev/null || true # keep the sudo timestamp fresh
+    sleep 0.5
+  done
+}
+
+if in_bootloader; then
+  echo "A board is already in bootloader mode; flashing it as the first half."
+fi
+
+for half in first second; do
+  echo
+  echo "==> Put the $half half into bootloader mode:"
+  echo "    unplug it, hold reset, plug it in, release reset."
+  wait_for present
+  echo "==> Bootloader found, flashing the $half half..."
+  sudo dfu-programmer "$MCU" erase --force
+  sudo dfu-programmer "$MCU" flash "$HEX"
+  sudo dfu-programmer "$MCU" launch
+  wait_for absent
+  echo "==> The $half half is done."
+done
+
+echo
+echo "Both halves flashed. Reconnect the halves and plug the keyboard back in."

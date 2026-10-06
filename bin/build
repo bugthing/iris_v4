@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Build the firmware in the official QMK Docker image.
+#
+# Usage: bin/build [--update]
+#
+# Clones qmk_firmware into $QMK_HOME (default ~/.cache/qmk_firmware) on first
+# run; --update pulls the latest QMK first. The keymap in this repo is mounted
+# into the container, so local edits are always what gets built. The result
+# is copied to ./keebio_iris_rev4_ben.hex, ready for bin/flash.
+
+set -euo pipefail
+
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+QMK_HOME="${QMK_HOME:-$HOME/.cache/qmk_firmware}"
+IMAGE=ghcr.io/qmk/qmk_cli
+KEYBOARD=keebio/iris/rev4
+KEYMAP=ben
+HEX=keebio_iris_rev4_ben.hex
+
+if [[ ! -d "$QMK_HOME/.git" ]]; then
+  echo "==> Cloning qmk_firmware into $QMK_HOME (first run only)..."
+  git clone --depth 1 --recurse-submodules --shallow-submodules \
+    https://github.com/qmk/qmk_firmware.git "$QMK_HOME"
+elif [[ "${1:-}" == --update ]]; then
+  echo "==> Updating qmk_firmware..."
+  git -C "$QMK_HOME" pull --ff-only
+  git -C "$QMK_HOME" submodule update --init --recursive --depth 1
+fi
+
+echo "==> Compiling $KEYBOARD:$KEYMAP..."
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -v "$QMK_HOME":/qmk_firmware \
+  -v "$REPO":/qmk_firmware/keyboards/keebio/iris/keymaps/$KEYMAP:ro \
+  -w /qmk_firmware \
+  "$IMAGE" \
+  qmk compile -kb "$KEYBOARD" -km "$KEYMAP"
+
+cp "$QMK_HOME/$HEX" "$REPO/$HEX"
+echo "==> Built $REPO/$HEX"
