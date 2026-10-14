@@ -1,0 +1,3 @@
+# Let the logged-in user write to the Iris rev4's hidraw nodes (Raw HID),
+# so bin/notify-led can run without sudo.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="cb10", ATTRS{idProduct}=="4256", TAG+="uaccess"

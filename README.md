@@ -102,6 +102,27 @@ This writes `keebio_iris_rev4_ben.hex` to this directory. Then flash both halves
 It asks for your sudo password up front, then for each half waits for the
 bootloader (unplug, hold reset, plug in, release), flashes it, and moves on.
 
+### Notification light
+
+The firmware has Raw HID enabled: `bin/notify-led` breathes the keyboard red
+while there are unread desktop notifications and turns it solid green when
+there are none. A notification stays unread until its app closes it, you
+invoke one of its actions, or you run `bin/notify-led clear` (bound to
+Super+Shift+comma, dismiss all, and Super+Shift+Alt+comma, history).
+Omarchy's own "Theme changed" style toasts are ignored.
+
+Once, allow your user to write to the keyboard without sudo, then replug it:
+
+    sudo cp host/50-iris-raw-hid.rules /etc/udev/rules.d/
+    sudo udevadm control --reload
+
+Check it works with `bin/notify-led red` and `bin/notify-led green`, then run
+the watcher as a user service:
+
+    ln -s "$PWD/bin/notify-led" ~/.local/bin/notify-led
+    cp host/notify-led.service ~/.config/systemd/user/
+    systemctl --user enable --now notify-led
+
 ### Use online tool
 
 Go to: https://config.qmk.fm/#/keebio/iris/rev4/LAYOUT

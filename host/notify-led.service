@@ -1,0 +1,13 @@
+# Flash the Iris red while there are unread notifications. See README.md.
+[Unit]
+Description=Iris keyboard notification light
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/notify-led
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Flash the Iris red while there are unread desktop notifications.
+
+Usage:
+  bin/notify-led          watch notifications and drive the keyboard
+  bin/notify-led clear    mark everything read (keyboard goes green)
+  bin/notify-led red      set the keyboard red once, for testing
+  bin/notify-led green    set the keyboard green once, for testing
+
+The watcher follows org.freedesktop.Notifications on the session bus via
+`busctl monitor`. A notification counts as unread from the moment it is sent
+until its app closes it, you invoke one of its actions, or you run
+`bin/notify-led clear`. Omarchy reports a popup timing out exactly as if you
+had dismissed it, so a plain close does not count as read.
+
+The keyboard needs the firmware from this repo (Raw HID enabled) and write
+access to its hidraw node; see README.md.
+"""
+
+import json
+import os
+import select
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+VENDOR_ID = 0xCB10  # Keebio
+PRODUCT_ID = 0x4256  # Iris rev4
+RAW_USAGE_PAGE = bytes([0x06, 0x60, 0xFF])  # QMK Raw HID, usage page 0xFF60
+REPORT_SIZE = 32
+
+# NotificationClosed reason for "closed by a call to CloseNotification", i.e.
+# the app withdrew it (Slack does once you read the message).
+CLOSED_BY_APP = 3
+
+# Omarchy's own "Theme changed" style toasts confirm something you just did.
+IGNORED_APPS = {"omarchy-action"}
+
+SERVICE = "notify-led.service"
+
+
+def find_device():
+    """Return the hidraw node for the Iris's Raw HID interface, or None."""
+    for node in sorted(Path("/sys/class/hidraw").glob("hidraw*")):
+        try:
+            uevent = (node / "device/uevent").read_text()
+            descriptor = (node / "device/report_descriptor").read_bytes()
+        except OSError:
+            continue
+        hid_id = f"HID_ID=0003:{VENDOR_ID:08X}:{PRODUCT_ID:08X}"
+        if hid_id in uevent and RAW_USAGE_PAGE in descriptor:
+            return f"/dev/{node.name}"
+    return None
+
+
+def send(unread, device=None):
+    """Tell the keyboard whether there is anything unread. Returns the node used."""
+    device = device or find_device()
+    if device is None:
+        return None
+    # Leading 0x00 is the report ID; the kernel strips it as QMK has none.
+    report = bytes([0, 1 if unread else 0]) + bytes(REPORT_SIZE - 1)
+    try:
+        with open(device, "wb", buffering=0) as f:
+            f.write(report)
+    except OSError as e:
+        print(f"notify-led: cannot write {device}: {e}", file=sys.stderr)
+        return None
+    return device
+
+
+def monitor():
+    """Yield each D-Bus message relevant to notifications, as parsed JSON.
+
+    Matches on interface and message type rather than the bus name, so the
+    watch survives the notification server restarting.
+    """
+    cmd = [
+        "busctl", "--user", "monitor", "--json=short",
+        "--match=type='method_call',interface='org.freedesktop.Notifications',member='Notify'",
+        "--match=type='signal',interface='org.freedesktop.Notifications',member='NotificationClosed'",
+        "--match=type='signal',interface='org.freedesktop.Notifications',member='ActionInvoked'",
+        "--match=type='method_return'",
+    ]
+    # busctl must not die from the SIGUSR1 that `clear` sends the watcher.
+    ignore_usr1 = lambda: signal.signal(signal.SIGUSR1, signal.SIG_IGN)
+    return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True, preexec_fn=ignore_usr1)
+
+
+def watch():
+    unread = set()
+    pending_calls = {}  # (caller, cookie) -> True, for Notify calls awaiting their ID
+    cleared = False
+
+    def on_clear(*_):
+        nonlocal cleared
+        cleared = True
+
+    signal.signal(signal.SIGUSR1, on_clear)
+    # Wake the select() below as soon as a signal lands, not at its timeout.
+    wake_r, wake_w = os.pipe()
+    os.set_blocking(wake_w, False)
+    signal.set_wakeup_fd(wake_w)
+
+    last_device = send(False)
+    last_state = False
+    proc = monitor()
+
+    while True:
+        ready, _, _ = select.select([proc.stdout, wake_r], [], [], 5)
+        if wake_r in ready:
+            os.read(wake_r, 64)
+
+        if proc.stdout in ready:
+            line = proc.stdout.readline()
+            if not line:
+                sys.exit(f"notify-led: busctl exited with {proc.wait()}")
+            msg = json.loads(line)
+            data = msg.get("payload", {}).get("data", [])
+            kind = msg.get("type")
+
+            if kind == "method_call" and msg.get("member") == "Notify":
+                if data and data[0] not in IGNORED_APPS:
+                    pending_calls[(msg.get("sender"), msg.get("cookie"))] = True
+            elif kind == "method_return":
+                key = (msg.get("destination"), msg.get("reply_cookie"))
+                if pending_calls.pop(key, False) and data:
+                    unread.add(data[0])
+            elif kind == "signal" and msg.get("member") == "NotificationClosed":
+                if len(data) == 2 and data[1] == CLOSED_BY_APP:
+                    unread.discard(data[0])
+            elif kind == "signal" and msg.get("member") == "ActionInvoked":
+                if data:
+                    unread.discard(data[0])
+
+        if cleared:
+            unread.clear()
+            pending_calls.clear()
+            cleared = False
+
+        state = bool(unread)
+        if state != last_state:
+            last_device = send(state)
+            last_state = state
+        elif not ready:
+            # Quiet for 5s: resend if the keyboard has been (re)plugged.
+            device = find_device()
+            if device and device != last_device:
+                last_device = send(state, device)
+
+
+def main():
+    command = sys.argv[1] if len(sys.argv) > 1 else "watch"
+    if command == "watch":
+        watch()
+    elif command == "clear":
+        result = subprocess.run(
+            ["systemctl", "--user", "kill", "--kill-whom=main", "--signal=USR1", SERVICE],
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode != 0:
+            send(False)  # watcher not running; just turn the keyboard green
+    elif command in ("red", "green"):
+        if send(command == "red") is None:
+            sys.exit("notify-led: keyboard not found (is the Raw HID firmware flashed?)")
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

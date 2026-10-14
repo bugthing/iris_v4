@@ -1,1 +1,2 @@
 EXTRAFLAGS+=-flto
+RAW_ENABLE = yes

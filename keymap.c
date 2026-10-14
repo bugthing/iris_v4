@@ -1,5 +1,6 @@
 #include QMK_KEYBOARD_H
 #include <print.h>
+#include "raw_hid.h"
 
 #define _QWERTY 0
 #define _LOWER 1
@@ -148,4 +149,16 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
         }
     }
     return true;
+}
+
+// bin/notify-led sends 0x01 when there are unread notifications and 0x00
+// when there are none. The _noeeprom calls keep this off the EEPROM.
+void raw_hid_receive(uint8_t *data, uint8_t length) {
+    if (data[0] == 0x01) {
+        rgblight_mode_noeeprom(RGBLIGHT_MODE_BREATHING + 3);
+        rgblight_sethsv_noeeprom(HSV_RED);
+    } else {
+        rgblight_mode_noeeprom(RGBLIGHT_MODE_STATIC_LIGHT);
+        rgblight_sethsv_noeeprom(HSV_GREEN);
+    }
 }
