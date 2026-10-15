@@ -152,13 +152,17 @@ bool encoder_update_user(uint8_t index, bool clockwise) {
 }
 
 // bin/notify-led sends 0x01 when there are unread notifications and 0x00
-// when there are none. The _noeeprom calls keep this off the EEPROM.
+// when there are none. Red uses the _noeeprom calls, so 0x00 can restore the
+// underglow saved in EEPROM, including switching it off if it was off.
 void raw_hid_receive(uint8_t *data, uint8_t length) {
     if (data[0] == 0x01) {
+        rgblight_enable_noeeprom();
         rgblight_mode_noeeprom(RGBLIGHT_MODE_BREATHING + 3);
         rgblight_sethsv_noeeprom(HSV_RED);
     } else {
-        rgblight_mode_noeeprom(RGBLIGHT_MODE_STATIC_LIGHT);
-        rgblight_sethsv_noeeprom(HSV_GREEN);
+        rgblight_reload_from_eeprom();
+        if (!rgblight_is_enabled()) {
+            rgblight_disable_noeeprom();
+        }
     }
 }

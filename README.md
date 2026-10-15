@@ -105,7 +105,7 @@ bootloader (unplug, hold reset, plug in, release), flashes it, and moves on.
 ### Notification light
 
 The firmware has Raw HID enabled: `bin/notify-led` breathes the keyboard red
-while there are unread desktop notifications and turns it solid green when
+while there are unread desktop notifications and restores your normal underglow when
 there are none. A notification stays unread until its app closes it, you
 invoke one of its actions, or you run `bin/notify-led clear` (bound to
 Super+Shift+comma, dismiss all, and Super+Shift+Alt+comma, history).
@@ -116,7 +116,7 @@ Once, allow your user to write to the keyboard without sudo, then replug it:
     sudo cp host/50-iris-raw-hid.rules /etc/udev/rules.d/
     sudo udevadm control --reload
 
-Check it works with `bin/notify-led red` and `bin/notify-led green`, then run
+Check it works with `bin/notify-led red` and `bin/notify-led off`, then run
 the watcher as a user service:
 
     ln -s "$PWD/bin/notify-led" ~/.local/bin/notify-led
