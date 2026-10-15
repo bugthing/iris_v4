@@ -85,7 +85,7 @@ def monitor():
     ]
     # busctl must not die from the SIGUSR1 that `clear` sends the watcher.
     ignore_usr1 = lambda: signal.signal(signal.SIGUSR1, signal.SIG_IGN)
-    return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True, preexec_fn=ignore_usr1)
+    return subprocess.Popen(cmd, stdout=subprocess.PIPE, preexec_fn=ignore_usr1)
 
 
 def watch():
@@ -106,38 +106,49 @@ def watch():
     last_device = send(False)
     last_state = False
     proc = monitor()
+    stdout = proc.stdout.fileno()
+    buffer = b""
+
+    def handle(msg):
+        data = msg.get("payload", {}).get("data", [])
+        kind = msg.get("type")
+
+        if kind == "method_call" and msg.get("member") == "Notify":
+            if data and data[0] not in IGNORED_APPS:
+                pending_calls[(msg.get("sender"), msg.get("cookie"))] = True
+        elif kind == "method_return":
+            key = (msg.get("destination"), msg.get("reply_cookie"))
+            if pending_calls.pop(key, False) and data:
+                unread.add(data[0])
+        elif kind == "signal" and msg.get("member") == "NotificationClosed":
+            if len(data) == 2 and data[1] == CLOSED_BY_APP:
+                unread.discard(data[0])
+        elif kind == "signal" and msg.get("member") == "ActionInvoked":
+            if data:
+                unread.discard(data[0])
 
     while True:
-        ready, _, _ = select.select([proc.stdout, wake_r], [], [], 5)
+        ready, _, _ = select.select([stdout, wake_r], [], [], 5)
         if wake_r in ready:
             os.read(wake_r, 64)
 
-        if proc.stdout in ready:
-            line = proc.stdout.readline()
-            if not line:
+        if stdout in ready:
+            # Read the pipe directly: a buffered readline() can leave whole
+            # messages in Python's buffer, where select() cannot see them.
+            chunk = os.read(stdout, 65536)
+            if not chunk:
                 sys.exit(f"notify-led: busctl exited with {proc.wait()}")
-            msg = json.loads(line)
-            data = msg.get("payload", {}).get("data", [])
-            kind = msg.get("type")
-
-            if kind == "method_call" and msg.get("member") == "Notify":
-                if data and data[0] not in IGNORED_APPS:
-                    pending_calls[(msg.get("sender"), msg.get("cookie"))] = True
-            elif kind == "method_return":
-                key = (msg.get("destination"), msg.get("reply_cookie"))
-                if pending_calls.pop(key, False) and data:
-                    unread.add(data[0])
-            elif kind == "signal" and msg.get("member") == "NotificationClosed":
-                if len(data) == 2 and data[1] == CLOSED_BY_APP:
-                    unread.discard(data[0])
-            elif kind == "signal" and msg.get("member") == "ActionInvoked":
-                if data:
-                    unread.discard(data[0])
+            *lines, buffer = (buffer + chunk).split(b"\n")
+            for line in lines:
+                if line:
+                    handle(json.loads(line))
 
         if cleared:
             unread.clear()
             pending_calls.clear()
             cleared = False
+            # Always send, in case the keyboard was set red outside the watcher.
+            last_state = None
 
         state = bool(unread)
         if state != last_state:
