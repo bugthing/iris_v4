@@ -5,7 +5,6 @@ Usage:
   bin/notify-led          watch notifications and drive the keyboard
   bin/notify-led clear    mark everything read (lights go back to normal)
   bin/notify-led red      set the keyboard red once, for testing
-  bin/notify-led off      restore the normal lights once, for testing
 
 The watcher follows org.freedesktop.Notifications on the session bus via
 `busctl monitor`. A notification counts as unread from the moment it is sent
@@ -172,8 +171,8 @@ def main():
         )
         if result.returncode != 0:
             send(False)  # watcher not running; just restore the normal lights
-    elif command in ("red", "off"):
-        if send(command == "red") is None:
+    elif command == "red":
+        if send(True) is None:
             sys.exit("notify-led: keyboard not found (is the Raw HID firmware flashed?)")
     else:
         sys.exit(__doc__)

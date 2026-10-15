@@ -116,7 +116,7 @@ Once, allow your user to write to the keyboard without sudo, then replug it:
     sudo cp host/50-iris-raw-hid.rules /etc/udev/rules.d/
     sudo udevadm control --reload
 
-Check it works with `bin/notify-led red` and `bin/notify-led off`, then run
+Check it works with `bin/notify-led red` and `bin/notify-led clear`, then run
 the watcher as a user service:
 
     ln -s "$PWD/bin/notify-led" ~/.local/bin/notify-led
